@@ -120,26 +120,6 @@
         (group-at* start-coord)
         @group-coords))))
 
-(defn group-at2
-  "An attempt at a purely-functional version of group-at. Terribly
-   inefficient."
-  [board start-coord]
-  (if-let [group-color (stone-at board start-coord)]
-    (letfn [(group-at*
-             [coord group-coords]
-             (let [color (stone-at board coord)]
-               (when (and (= color group-color)
-                          (not (contains? group-coords coord)))
-                 (let [neighbors (coords-around coord)
-                       group-coords (conj group-coords coord)]
-                   (conj
-                    (filter (complement nil?)
-                            (reduce concat
-                                    (for [c neighbors]
-                                      (group-at* c group-coords))))
-                    coord)))))]
-      (vec (set (group-at* start-coord #{}))))))
-
 (defn group-libs
   "Returns the number of liberties of the given group of coords"
   [board group-coords]
