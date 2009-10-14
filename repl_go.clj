@@ -251,17 +251,19 @@
 
 (defn play-move
   "If the given move is allowed, make it real"
-  ;; TODO: handle pass, take a string like "E5" 
+  ;; TODO: handle pass
   [label]
   (if-let [newg (try-move @game-states (label->coord label))]
-    (swap! game-states conj newg)
-    (println "You can't play there!"))
-  (print-game))
+    (do
+      (swap! game-states conj newg)
+      (print-game))
+    (println "You can't play there!")))
 
 (defn undo-move
   "Revert to the previous game state"
   []
   (if (> (count @game-states) 1)
-    (swap! game-states pop)
-    (println "Nothing to undo!"))
-  (print-game))
+    (do
+      (swap! game-states pop)
+      (print-game))
+    (println "Nothing to undo!")))
