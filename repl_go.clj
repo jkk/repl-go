@@ -19,25 +19,33 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board handling
 
-(def size 9) ;; TODO: determine on-the-fly
+(defn empty-board
+  "Generates an empty board of the given size"
+  [size]
+  (vec (repeat (* size size) :empty)))
 
-(def empty-board (vec (repeat (* size size) :empty)))
+(def board-size
+  (memoize
+   (fn [board]
+     (int (Math/sqrt (count board))))))
 
 (defn in-bounds?
   "Whether the given coord falls within the board size"
-  [[x y]]
-  (and (>= x 0) (< x size) (>= y 0) (< y size)))
+  [board [x y]]
+  (let [size (board-size board)]
+    (and (>= x 0) (< x size) (>= y 0) (< y size))))
 
 (defn coord->index
   "Return the index of a given coordinate within a board vector"
-  [[x y]]
-  (when (in-bounds? [x y])
-    (+ (* y size) x)))
+  [board [x y]]
+  (let [size (board-size board)]
+    (when (in-bounds? board [x y])
+      (+ (* y size) x))))
 
 (defn stone-at
   "Return the stone at the given board coordinate, or nil"
   [board coord]
-  (when-let [idx (coord->index coord)]
+  (when-let [idx (coord->index board coord)]
     (board idx)))
 
 (defn add-stones
@@ -47,10 +55,10 @@
   ([board]
      board)
   ([board stone coord]
-     (when-let [idx (coord->index coord)]
+     (when-let [idx (coord->index board coord)]
        (assoc board idx stone)))
   ([board stone coord & scs]
-     (when-let [idx (coord->index coord)]
+     (when-let [idx (coord->index board coord)]
        (let [ret (assoc board idx stone)]
          (if scs
            (recur ret (first scs) (second scs) (nnext scs))
@@ -62,18 +70,22 @@
   "Render an ASCII text board suitable for printing"
   ;; TODO: print row/col labels
   [board]
-  (apply str
-         (for [y (range size) x (range size)]
-           (str (stone->char (stone-at board [x y]))
-                \space
-                (when (= x (dec size)) \newline)))))
+  (let [size (board-size board)]
+    (apply str
+           (for [y (range size) x (range size)]
+             (str (stone->char (stone-at board [x y]))
+                  \space
+                  (when (= x (dec size)) \newline))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state
 
 (defstruct game-struct :board :turn :move-number :b-captures :w-captures)
 
-(def blank-game (struct game-struct empty-board :b 0 0 0))
+(defn blank-game
+  "Generate a blank game map"
+  [size]
+  (struct game-struct (empty-board size) :b 0 0 0))
 
 (def stone->label {:b "Black" :w "White" :empty "Empty"})
 
@@ -146,11 +158,11 @@
   "Tries playing a move to see if it's allowed. Returns a 'new' game state
    when everything is okay, or nil."
   [game-states coord]
-  (let [g (peek game-states)]
-    (when (and (in-bounds? coord)
-               (= :empty (stone-at (:board g) coord)))
-      (let [curb (:board g)
-            oldb (:board (peek (pop game-states)))
+  (let [g (peek game-states)
+        curb (:board g)]
+    (when (and (in-bounds? curb coord)
+               (= :empty (stone-at curb coord)))
+      (let [oldb (:board (peek (pop game-states)))
             uncapb (add-stones curb (:turn g) coord)
             [newb, bcaps, wcaps] (capture-stones uncapb coord)]
         (when-not (= newb oldb) ;; ko?
@@ -185,10 +197,12 @@
   (println (render-game (peek @game-states))))
 
 (defn start-game
-  "Reset the game to a clean slate"
-  []
-  (swap! game-states (fn [_] [blank-game]))
-  (print-game))
+  "Reset the game to a clean slate, setting the board to the given size"
+  ([]
+     (start-game 9))
+  ([size]
+     (swap! game-states (fn [_] [(blank-game size)]))
+     (print-game)))
 
 (defn play-move
   "If the given move is allowed, make it real"
