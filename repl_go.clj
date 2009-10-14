@@ -6,9 +6,9 @@
 ;;
 ;;     (use 'repl-go)
 ;;     (start-game)
-;;     (play-move "d4")          ; Black move
-;;     (play-move "c4")          ; White move
-;;     (play-move "c5")          ; Black move
+;;     (play-move :d4)          ; Black move
+;;     (play-move :c4)          ; White move
+;;     (play-move :c5)          ; Black move
 ;;     ...
 ;;
 ;; Copyright (c) 2009 Justin Kramer <jkkramer@gmail.com>
@@ -107,7 +107,8 @@
 (defn label->coord
   "Converts a coord label (A5) to a coord ([0 4])"
   [label]
-  (let [x (- (int (.charAt (.toUpperCase label) 0)) (int \A))
+  (let [label (if (keyword? label) (.substring (str label) 1) (str label))
+        x (- (int (.charAt (.toUpperCase label) 0)) (int \A))
         y (dec (to-int (.substring label 1) -1))]
     [x y]))
 
