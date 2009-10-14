@@ -135,24 +135,40 @@
 (defn group-libs
   "Returns the number of liberties of the given group of coords"
   [board group-coords]
-  (apply + (map #(stone-libs board %) group-coords)))
+  (when group-coords
+    (apply + (map #(stone-libs board %) group-coords))))
+
+(defn tally
+  "Returns a map of values to the number of times each value
+   appears in the given sequence. Optionally starts with the given
+   tally map."
+  ([s]
+     (tally s {}))
+  ([s start]
+     (reduce (fn [m val] (assoc m val (inc (get m val 0)))) start s)))
 
 (defn capture-stones
   "Capture any stones with zero liberties surrounding the given
-   coord (presumed to be the last point played). Returns a vector
-   of the 'new' board, count of captured black stones, and count of
-   captured white stones"
+   coord (presumed to be the last point played). Also captures the
+   played stone if suiciding. Returns a vector of the 'new' board,
+   count of captured white stones, and count of
+   captured black stones"
   [board coord]
-  (let [groups (map #(group-at board %) (coords-around coord))
-        cap-groups (filter #(= 0 (group-libs board %)) groups)
-        cap-coords (reduce concat cap-groups)
+  (let [opp-color (opposite-color (stone-at board coord))
+        opp-coords (filter #(= opp-color (stone-at board %))
+                           (coords-around coord))
+        opp-groups (map #(group-at board %) opp-coords)
+        cap-groups (filter #(= 0 (group-libs board %)) opp-groups)
+        cap-coords (if (< 0 (count cap-groups))
+                     (reduce concat cap-groups)
+                     (let [self-group (group-at board coord)]
+                       (when (= 0 (group-libs board self-group))
+                         self-group)))  ;; suicide
         cap-stones (map #(stone-at board %) cap-coords)
-        ;; TODO: cap-tally
-        bcaps (count (filter #(= :w %) cap-stones))
-        wcaps (count (filter #(= :b %) cap-stones))
-        stones-coords (interleave (repeat :empty) cap-coords)
-        new-board (apply add-stones (concat [board] stones-coords))]
-    [new-board bcaps wcaps]))
+        cap-tally (tally cap-stones {:b 0 :w 0})
+        empty-coords (interleave (repeat :empty) cap-coords)
+        new-board (apply add-stones (concat [board] empty-coords))]
+    [new-board (:w cap-tally) (:b cap-tally)]))
 
 (defn try-move
   "Tries playing a move to see if it's allowed. Returns a 'new' game state
