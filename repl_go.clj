@@ -212,6 +212,14 @@
             :b-captures (+ bcaps (:b-captures g))
             :w-captures (+ wcaps (:w-captures g))))))))
 
+(defn try-pass
+  "Returns a new game state representing the game after a pass"
+  [game-states]
+  (let [g (peek game-states)]
+    (assoc g
+        :turn (opposite-color (:turn g))
+        :move-number (inc (:move-number g)))))
+
 (defn score
   []
   ;; TODO?
@@ -245,13 +253,17 @@
 
 (defn play-move
   "If the given move is allowed, make it real"
-  ;; TODO: handle pass
   [label]
   (if-let [newg (try-move @game-states (label->coord label))]
     (do
       (swap! game-states conj newg)
       (print-game))
     (println "You can't play there!")))
+
+(defn pass
+  []
+  (swap! game-states conj (try-pass @game-states))
+  (print-game))
 
 (defn undo-move
   "Revert to the previous game state"
