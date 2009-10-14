@@ -6,15 +6,39 @@
 ;;
 ;;     (use 'repl-go)
 ;;     (start-game)
-;;     (play-move [4 4])          ; Black move
-;;     (play-move [3 4])          ; White move
-;;     (play-move [3 5])          ; Black move
+;;     (play-move "d4")          ; Black move
+;;     (play-move "c4")          ; White move
+;;     (play-move "c5")          ; Black move
 ;;     ...
 ;;
 ;; Copyright (c) 2009 Justin Kramer <jkkramer@gmail.com>
 ;; Licensed under WTFPL, http://en.wikipedia.org/wiki/WTFPL
 
 (ns repl-go)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Utility functions
+
+(defn to-int
+  "Converts arg to an integer, with an optional fallback value"
+  ([x] (to-int x nil))
+  ([x errval] (try (Integer. x) (catch Exception _ errval))))
+
+(defn tally
+  "Returns a map of values to the number of times each value
+   appears in the given sequence. Optionally starts with the given
+   tally map."
+  ([s]
+     (tally s {}))
+  ([s start]
+     (reduce (fn [m val] (assoc m val (inc (get m val 0)))) start s)))
+
+(defn pad
+  "Left-pad a string"
+  ([s len]
+     (pad s len \space))
+  ([s len pad]
+     (str s (apply str (repeat (- len (.length s)) pad)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board handling
@@ -66,16 +90,31 @@
 
 (def stone->char {:b \X :w \O :empty \.})
 
+(def x-axis-labels
+     ;; infinite sequence
+     (filter #(not= % \I)
+             (for [i (iterate inc 0)] (char (+ (int \A) i)))))
+
 (defn render-board
   "Render an ASCII text board suitable for printing"
-  ;; TODO: print row/col labels
   [board]
   (let [size (board-size board)]
     (apply str
+           \space \space \space
+           (apply str (interpose \space (take size x-axis-labels)))
+           \newline
            (for [y (range size) x (range size)]
-             (str (stone->char (stone-at board [x y]))
+             (str (when (= x 0) (pad (str (inc y) \space) 3))
+                  (stone->char (stone-at board [x y]))
                   \space
                   (when (= x (dec size)) \newline))))))
+
+(defn label->coord
+  "Converts a coord label (A5) to a coord ([0 4])"
+  [label]
+  (let [x (- (int (.charAt (.toUpperCase label) 0)) (int \A))
+        y (dec (to-int (.substring label 1) -1))]
+    [x y]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state
@@ -138,21 +177,11 @@
   (when group-coords
     (apply + (map #(stone-libs board %) group-coords))))
 
-(defn tally
-  "Returns a map of values to the number of times each value
-   appears in the given sequence. Optionally starts with the given
-   tally map."
-  ([s]
-     (tally s {}))
-  ([s start]
-     (reduce (fn [m val] (assoc m val (inc (get m val 0)))) start s)))
-
 (defn capture-stones
-  "Capture any stones with zero liberties surrounding the given
-   coord (presumed to be the last point played). Also captures the
-   played stone if suiciding. Returns a vector of the 'new' board,
-   count of captured white stones, and count of
-   captured black stones"
+  "Capture any opponent stones with zero liberties surrounding the
+   given coord (presumed to be the last point played). Also captures
+   the played stone if suiciding. Returns a vector of the 'new' board,
+   count of captured white stones, and count of captured black stones"
   [board coord]
   (let [opp-color (opposite-color (stone-at board coord))
         opp-coords (filter #(= opp-color (stone-at board %))
@@ -223,8 +252,8 @@
 (defn play-move
   "If the given move is allowed, make it real"
   ;; TODO: handle pass, take a string like "E5" 
-  [coord]
-  (if-let [newg (try-move @game-states coord)]
+  [label]
+  (if-let [newg (try-move @game-states (label->coord label))]
     (swap! game-states conj newg)
     (println "You can't play there!"))
   (print-game))
