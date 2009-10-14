@@ -72,21 +72,16 @@
   (when-let [idx (coord->index board coord)]
     (board idx)))
 
+(defn add-stone
+  "Return a board with a stone (:b, :w, :empty) added at a coordinate"
+  [board stone coord]
+  (when-let [idx (coord->index board coord)]
+    (assoc board idx stone)))
+
 (defn add-stones
-  "Return a board with stones (:b, :w, :empty) added at coordinates.
-   Example:
-       (add-stones board :w [4 4] :b [6 3])"
-  ([board]
-     board)
-  ([board stone coord]
-     (when-let [idx (coord->index board coord)]
-       (assoc board idx stone)))
-  ([board stone coord & scs]
-     (when-let [idx (coord->index board coord)]
-       (let [ret (assoc board idx stone)]
-         (if scs
-           (recur ret (first scs) (second scs) (nnext scs))
-           ret)))))
+  "Add multiple stones of the same type"
+  [board stone coords]
+  (reduce #(add-stone %1 stone %2) board coords))
 
 (def stone->char {:b \X :w \O :empty \.})
 
@@ -175,7 +170,7 @@
   "Returns the number of liberties of the given group of coords"
   [board group-coords]
   (when group-coords
-    (apply + (map #(stone-libs board %) group-coords))))
+    (reduce + (map #(stone-libs board %) group-coords))))
 
 (defn capture-stones
   "Capture any opponent stones with zero liberties surrounding the
@@ -195,8 +190,7 @@
                          self-group)))  ;; suicide
         cap-stones (map #(stone-at board %) cap-coords)
         cap-tally (tally cap-stones {:b 0 :w 0})
-        empty-coords (interleave (repeat :empty) cap-coords)
-        new-board (apply add-stones (concat [board] empty-coords))]
+        new-board (add-stones board :empty cap-coords)]
     [new-board (:w cap-tally) (:b cap-tally)]))
 
 (defn try-move
@@ -208,7 +202,7 @@
     (when (and (in-bounds? curb coord)
                (= :empty (stone-at curb coord)))
       (let [oldb (:board (peek (pop game-states)))
-            uncapb (add-stones curb (:turn g) coord)
+            uncapb (add-stone curb (:turn g) coord)
             [newb, bcaps, wcaps] (capture-stones uncapb coord)]
         (when-not (= newb oldb) ;; ko?
           (struct-map game-struct
