@@ -109,36 +109,6 @@
     [x y]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Game state
-
-(defstruct game-struct :board :turn :movenum :bcaps :wcaps)
-
-(defn blank-game
-  "Generate a blank game map"
-  [size]
-  (struct game-struct (empty-board size) :b 0 0 0))
-
-(defn next-game-state
-  "Generate the next game state based on the given state and optional
-   map of game state key/vals"
-  [g & [kvs]]
-  (merge (assoc g
-           :turn (opposite-color (:turn g))
-           :movenum (inc (:movenum g)))
-         (or kvs {})))
-
-(def stone->label {:b "Black" :w "White" :empty "Empty"})
-
-(defn render-game
-  "Render a game's board and various states as text"
-  [g]
-  (str "Move " (:movenum g) \newline
-       (stone->label :b) " captures: " (:bcaps g) \newline
-       (stone->label :w) " captures: " (:wcaps g) \newline
-       (stone->label (:turn g)) " to play" \newline
-       (render-board (:board g))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rule enforcement
 
 (def opposite-color {:b :w :w :b})
@@ -215,6 +185,36 @@
   []
   ;; TODO?
   )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Game state
+
+(defstruct game-struct :board :turn :movenum :bcaps :wcaps)
+
+(defn blank-game
+  "Generate a blank game state"
+  [size]
+  (struct game-struct (empty-board size) :b 0 0 0))
+
+(defn next-game-state
+  "Generate the next game state based on the given state and optional
+   map of game state key/vals"
+  [g & [kvs]]
+  (merge (assoc g
+           :turn (opposite-color (:turn g))
+           :movenum (inc (:movenum g)))
+         kvs))
+
+(def stone->label {:b "Black" :w "White" :empty "Empty"})
+
+(defn render-game
+  "Render a game's board and various states as text"
+  [g]
+  (str "Move " (:movenum g) \newline
+       (stone->label :b) " captures: " (:bcaps g) \newline
+       (stone->label :w) " captures: " (:wcaps g) \newline
+       (stone->label (:turn g)) " to play" \newline
+       (render-board (:board g))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state succession, game playing, output
