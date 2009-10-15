@@ -252,9 +252,8 @@
       (let [newg (next-game-state g {:board newb
                                      :bcaps (+ bcaps (:bcaps g))
                                      :wcaps (+ wcaps (:wcaps g))})]
-        (do
-          (swap! game-states conj newg)
-          (print-game)))
+        (swap! game-states conj newg)
+        (print-game))
       (println "You can't play there!"))))
 
 (defn pass
