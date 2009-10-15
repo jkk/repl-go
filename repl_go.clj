@@ -50,27 +50,25 @@
 
 (defn in-bounds?
   "Whether the given coord falls within the board size"
-  [board [x y]]
-  (let [size (board-size board)]
-    (and (>= x 0) (< x size) (>= y 0) (< y size))))
+  [size [x y]]
+  (and (>= x 0) (< x size) (>= y 0) (< y size)))
 
 (defn coord->index
   "Return the index of a given coordinate within a board vector"
-  [board [x y]]
-  (let [size (board-size board)]
-    (when (in-bounds? board [x y])
-      (+ (* y size) x))))
+  [size [x y]]
+  (when (in-bounds? size [x y])
+    (+ (* y size) x)))
 
 (defn stone-at
   "Return the stone at the given board coordinate, or nil"
   [board coord]
-  (when-let [idx (coord->index board coord)]
+  (when-let [idx (coord->index (board-size board) coord)]
     (board idx)))
 
 (defn add-stone
   "Return a board with a stone (:b, :w, :empty) added at a coordinate"
   [board stone coord]
-  (when-let [idx (coord->index board coord)]
+  (when-let [idx (coord->index (board-size board) coord)]
     (assoc board idx stone)))
 
 (defn add-stones
@@ -174,7 +172,7 @@
    returns a vector of 'new' board, B captures, and W captures. Otherwise,
    nil."
   [board stone coord & [old-board]]
-  (when (and (in-bounds? board coord)
+  (when (and (in-bounds? (board-size board) coord)
              (= :empty (stone-at board coord)))
     (let [raw-board (add-stone board stone coord)
           [new-board, bcaps, wcaps] (capture-stones raw-board coord)]
