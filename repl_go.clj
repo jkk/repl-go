@@ -78,10 +78,15 @@
 
 (def stone->char {:b \X :w \O :empty \.})
 
+(defn int->letter
+  "0 => A, 1 => B, etc."
+  [x]
+  (char (+ (int \A) x)))
+
 (def x-axis-labels
      ;; infinite sequence
-     (filter #(not= % \I)
-             (for [i (iterate inc 0)] (char (+ (int \A) i)))))
+     (filter (partial not= \I)
+             (map int->letter (iterate inc 0))))
 
 (defn render-board
   "Render an ASCII text board suitable for printing"
@@ -121,13 +126,13 @@
   "Returns the number of liberties of the stone at the given coord,
    independent of any connected stones"
   [board coord]
-  (count (filter #(= :empty %)
-                 (map #(stone-at board %)
-                      (coords-around coord)))))
+  (count (filter #(= :empty (stone-at board %))
+                 (coords-around coord))))
 
 (defn group-at
   "Returns a set of the coords of all stones connected to the
-   stone at the given coord."
+   stone at the given coord. Can also be used to find contiguous
+   areas of :empty coords."
   [board start-coord]
   (with-local-vars [group-coords #{}]
     (let [group-color (stone-at board start-coord)
@@ -136,7 +141,7 @@
                                  (not (contains? @group-coords coord)))
                         (var-set group-coords (conj @group-coords coord))
                         (dorun (map group-at* (coords-around coord)))))]
-      (when (and group-color (not= :empty group-color))
+      (when group-color
         (group-at* start-coord)
         @group-coords))))
 
@@ -144,7 +149,7 @@
   "Returns the number of liberties of the given group of coords"
   [board group-coords]
   (when group-coords
-    (reduce + (map #(stone-libs board %) group-coords))))
+    (reduce + (map (partial stone-libs board) group-coords))))
 
 (defn capture-stones
   "Capture any opponent stones with zero liberties surrounding the
