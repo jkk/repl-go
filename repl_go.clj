@@ -21,24 +21,19 @@
 
 (defn to-int
   "Converts arg to an integer, with an optional fallback value"
-  ([x] (to-int x nil))
-  ([x errval] (try (Integer. x) (catch Exception _ errval))))
+  [x & [errval]] (try (Integer. x) (catch Exception _ errval)))
 
 (defn tally
   "Returns a map of values to the number of times each value
    appears in the given sequence. Optionally starts with the given
    tally map."
-  ([s]
-     (tally s {}))
-  ([s start]
-     (reduce (fn [m val] (assoc m val (inc (get m val 0)))) start s)))
+  [s & [start]]
+  (reduce (fn [m val] (assoc m val (inc (get m val 0)))) (or start {}) s))
 
 (defn pad
   "Left-pad a string"
-  ([s len]
-     (pad s len \space))
-  ([s len pad]
-     (str s (apply str (repeat (- len (.length s)) pad)))))
+  [s len & [pad]]
+  (str s (apply str (repeat (- len (.length s)) (or pad \space)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board handling
@@ -108,7 +103,8 @@
   "Converts a coord label (A5) to a coord ([0 4])"
   [label]
   (let [label (if (keyword? label) (.substring (str label) 1) (str label))
-        x (- (int (.charAt (.toUpperCase label) 0)) (int \A))
+        charval (int (.charAt (.toUpperCase label) 0))
+        x (- (if (> charval (int \I)) (dec charval) charval) (int \A))
         y (dec (to-int (.substring label 1) -1))]
     [x y]))
 
@@ -121,6 +117,15 @@
   "Generate a blank game map"
   [size]
   (struct game-struct (empty-board size) :b 0 0 0))
+
+(defn next-game-state
+  "Generate the next game state based on the given state and optional
+   map of game state key/vals"
+  [g & [kvs]]
+  (merge (assoc g
+           :turn (opposite-color (:turn g))
+           :move-number (inc (:move-number g)))
+         (or kvs {})))
 
 (def stone->label {:b "Black" :w "White" :empty "Empty"})
 
@@ -195,31 +200,16 @@
     [new-board (:w cap-tally) (:b cap-tally)]))
 
 (defn try-move
-  "Tries playing a move to see if it's allowed. Returns a 'new' game state
-   when everything is okay, or nil."
-  [game-states coord]
-  (let [g (peek game-states)
-        curb (:board g)]
-    (when (and (in-bounds? curb coord)
-               (= :empty (stone-at curb coord)))
-      (let [oldb (:board (peek (pop game-states)))
-            uncapb (add-stone curb (:turn g) coord)
-            [newb, bcaps, wcaps] (capture-stones uncapb coord)]
-        (when-not (= newb oldb) ;; ko?
-          (struct-map game-struct
-            :board newb
-            :turn (opposite-color (:turn g))
-            :move-number (inc (:move-number g))
-            :b-captures (+ bcaps (:b-captures g))
-            :w-captures (+ wcaps (:w-captures g))))))))
-
-(defn try-pass
-  "Returns a new game state representing the game after a pass"
-  [game-states]
-  (let [g (peek game-states)]
-    (assoc g
-        :turn (opposite-color (:turn g))
-        :move-number (inc (:move-number g)))))
+  "Tries playing a move to see if it's allowed. When everything's okay,
+   returns a vector of 'new' board, B captures, and W captures. Otherwise,
+   nil."
+  [board stone coord & [old-board]]
+  (when (and (in-bounds? board coord)
+             (= :empty (stone-at board coord)))
+    (let [raw-board (add-stone board stone coord)
+          [new-board, bcaps, wcaps] (capture-stones raw-board coord)]
+      (when-not (= new-board old-board) ;; ko?
+        [new-board bcaps wcaps]))))
 
 (defn score
   []
@@ -246,24 +236,31 @@
 
 (defn start-game
   "Reset the game to a clean slate, setting the board to the given size"
-  ([]
-     (start-game 9))
-  ([size]
-     (swap! game-states (fn [_] [(blank-game size)]))
-     (print-game)))
+  [& [size]]
+  (swap! game-states (fn [_] [(blank-game (or size 9))]))
+  (print-game))
 
 (defn play-move
   "If the given move is allowed, make it real"
   [label]
-  (if-let [newg (try-move @game-states (label->coord label))]
-    (do
-      (swap! game-states conj newg)
-      (print-game))
-    (println "You can't play there!")))
+  (let [g (peek @game-states)
+        board (:board g)
+        stone (:turn g)
+        coord (label->coord label)
+        oldb (:board (peek (pop @game-states)))]
+    (if-let [[newb bcaps wcaps] (try-move board stone coord oldb)]
+      (let [newg (next-game-state g {:board newb
+                                     :b-captures (+ bcaps (:b-captures g))
+                                     :w-captures (+ wcaps (:w-captures g))})]
+        (do
+          (swap! game-states conj newg)
+          (print-game)))
+      (println "You can't play there!"))))
 
 (defn pass
+  "Skip a turn"
   []
-  (swap! game-states conj (try-pass @game-states))
+  (swap! game-states conj (next-game-state (peek @game-states)))
   (print-game))
 
 (defn undo-move
