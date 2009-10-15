@@ -111,7 +111,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state
 
-(defstruct game-struct :board :turn :move-number :b-captures :w-captures)
+(defstruct game-struct :board :turn :movenum :bcaps :wcaps)
 
 (defn blank-game
   "Generate a blank game map"
@@ -124,7 +124,7 @@
   [g & [kvs]]
   (merge (assoc g
            :turn (opposite-color (:turn g))
-           :move-number (inc (:move-number g)))
+           :movenum (inc (:movenum g)))
          (or kvs {})))
 
 (def stone->label {:b "Black" :w "White" :empty "Empty"})
@@ -132,9 +132,9 @@
 (defn render-game
   "Render a game's board and various states as text"
   [g]
-  (str "Move " (:move-number g) \newline
-       (stone->label :b) " captures: " (:b-captures g) \newline
-       (stone->label :w) " captures: " (:w-captures g) \newline
+  (str "Move " (:movenum g) \newline
+       (stone->label :b) " captures: " (:bcaps g) \newline
+       (stone->label :w) " captures: " (:wcaps g) \newline
        (stone->label (:turn g)) " to play" \newline
        (render-board (:board g))))
 
@@ -250,8 +250,8 @@
         oldb (:board (peek (pop @game-states)))]
     (if-let [[newb bcaps wcaps] (try-move board stone coord oldb)]
       (let [newg (next-game-state g {:board newb
-                                     :b-captures (+ bcaps (:b-captures g))
-                                     :w-captures (+ wcaps (:w-captures g))})]
+                                     :bcaps (+ bcaps (:bcaps g))
+                                     :wcaps (+ wcaps (:wcaps g))})]
         (do
           (swap! game-states conj newg)
           (print-game)))
