@@ -116,7 +116,7 @@
 
 (def opposite-color {:b :w :w :b})
 
-(defn coords-around
+(defn neighbors
   "Returns a vector of the coords surrounding the given coord (left, right,
    top, bottom). Note that some may be out of bounds."
   [[x y]]
@@ -127,7 +127,7 @@
    independent of any connected stones"
   [board coord]
   (count (filter #(= :empty (stone-at board %))
-                 (coords-around coord))))
+                 (neighbors coord))))
 
 (defn group-at
   "Returns a set of the coords of all stones connected to the
@@ -140,7 +140,7 @@
                       (when (and (= group-color (stone-at board coord))
                                  (not (contains? @group-coords coord)))
                         (var-set group-coords (conj @group-coords coord))
-                        (dorun (map group-at* (coords-around coord)))))]
+                        (dorun (map group-at* (neighbors coord)))))]
       (when group-color
         (group-at* start-coord)
         @group-coords))))
@@ -158,19 +158,18 @@
    count of captured white stones, and count of captured black stones"
   [board coord]
   (let [opp-color (opposite-color (stone-at board coord))
-        opp-coords (filter #(= opp-color (stone-at board %))
-                           (coords-around coord))
-        opp-groups (map #(group-at board %) opp-coords)
-        cap-groups (filter #(= 0 (group-libs board %)) opp-groups)
+        cap-groups (->> (neighbors coord)
+                        (filter #(= opp-color (stone-at board %)))
+                        (map #(group-at board %))
+                        (filter #(= 0 (group-libs board %))))
         cap-coords (if (< 0 (count cap-groups))
                      (reduce concat cap-groups)
                      (let [self-group (group-at board coord)]
                        (when (= 0 (group-libs board self-group))
-                         self-group)))  ;; suicide
-        cap-stones (map #(stone-at board %) cap-coords)
-        cap-tally (tally cap-stones {:b 0 :w 0})
+                         self-group))) ;; suicide
+        cap-tally (tally (map #(stone-at board %) cap-coords))
         new-board (add-stones board :empty cap-coords)]
-    [new-board (:w cap-tally) (:b cap-tally)]))
+    [new-board (:w cap-tally 0) (:b cap-tally 0)]))
 
 (defn try-move
   "Tries playing a move to see if it's allowed. When everything's okay,
