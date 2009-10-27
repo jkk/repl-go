@@ -14,7 +14,8 @@
 ;; Copyright (c) 2009 Justin Kramer <jkkramer@gmail.com>
 ;; Licensed under WTFPL, http://en.wikipedia.org/wiki/WTFPL
 
-(ns repl-go)
+(ns repl-go
+  (:use [clojure.contrib.seq-utils :only (frequencies)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utility functions
@@ -22,18 +23,6 @@
 (defn to-int
   "Converts arg to an integer, with an optional fallback value"
   [x & [errval]] (try (Integer. x) (catch Exception _ errval)))
-
-(defn tally
-  "Returns a map of values to the number of times each value
-   appears in the given sequence. Optionally starts with the given
-   tally map."
-  [s & [start]]
-  (reduce (fn [m val] (assoc m val (inc (get m val 0)))) (or start {}) s))
-
-(defn pad
-  "Left-pad a string"
-  [s len & [pad]]
-  (str s (apply str (repeat (- len (.length s)) (or pad \space)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board handling
@@ -97,7 +86,7 @@
            (apply str (interpose \space (take size x-axis-labels)))
            \newline
            (for [y (range size) x (range size)]
-             (str (when (= x 0) (pad (str (inc y) \space) 3))
+             (str (when (= x 0) (str (format "%1$2d" (inc y)) \space))
                   (stone->char (stone-at board [x y]))
                   \space
                   (when (= x (dec size)) \newline))))))
@@ -167,7 +156,7 @@
                      (let [self-group (group-at board coord)]
                        (when (= 0 (group-libs board self-group))
                          self-group))) ;; suicide
-        cap-tally (tally (map #(stone-at board %) cap-coords))
+        cap-tally (frequencies (map #(stone-at board %) cap-coords))
         new-board (add-stones board :empty cap-coords)]
     [new-board (:w cap-tally 0) (:b cap-tally 0)]))
 
