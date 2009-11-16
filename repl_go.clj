@@ -125,16 +125,15 @@
   [board start-coord]
   (when-let [group-color (stone-at board start-coord)]
     (loop [group #{}
-           pending #{start-coord}
-           seen pending]
+           pending #{start-coord}]
       (if-let [coord (first pending)]
         (recur (conj group coord)
                (reduce conj
                        (disj pending coord)
                        (filter #(and (= group-color (stone-at board %))
-                                     (not (contains? seen %)))
-                               (neighbors coord)))
-               (reduce conj seen (neighbors coord)))
+                                     (not (contains? pending %))
+                                     (not (contains? group %)))
+                               (neighbors coord))))
         group))))
 
 (defn group-libs
