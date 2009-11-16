@@ -123,16 +123,19 @@
    stone at the given coord. Can also be used to find contiguous
    areas of :empty coords."
   [board start-coord]
-  (with-local-vars [group-coords #{}]
-    (let [group-color (stone-at board start-coord)
-          group-at* (fn group-at* [coord]
-                      (when (and (= group-color (stone-at board coord))
-                                 (not (contains? @group-coords coord)))
-                        (var-set group-coords (conj @group-coords coord))
-                        (dorun (map group-at* (neighbors coord)))))]
-      (when group-color
-        (group-at* start-coord)
-        @group-coords))))
+  (when-let [group-color (stone-at board start-coord)]
+    (loop [group #{}
+           pending #{start-coord}
+           seen pending]
+      (if-let [coord (first pending)]
+        (recur (conj group coord)
+               (reduce conj
+                       (disj pending coord)
+                       (filter #(and (= group-color (stone-at board %))
+                                     (not (contains? seen %)))
+                               (neighbors coord)))
+               (reduce conj seen (neighbors coord)))
+        group))))
 
 (defn group-libs
   "Returns the number of liberties of the given group of coords"
