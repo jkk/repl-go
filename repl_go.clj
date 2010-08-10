@@ -10,6 +10,7 @@
 ;;     (play-move :c4)          ; White move
 ;;     (play-move :c5)          ; Black move
 ;;     ...
+;;     (print-score)
 ;;
 ;; Copyright (c) 2009 Justin Kramer <jkkramer@gmail.com>
 ;; Licensed under WTFPL, http://en.wikipedia.org/wiki/WTFPL
@@ -263,6 +264,13 @@
        (stone->label (:turn g)) " to play" \newline
        (render-board (:board g))))
 
+(defn render-score
+  "Render a game's score as text"
+  [g]
+  (let [score (score (:board g))]
+    (str (stone->label :b) ": " (:b score) \newline
+         (stone->label :w) ": " (:w score) \newline)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state succession, game playing, output
 ;;
@@ -280,6 +288,11 @@
   "Prints current game state"
   []
   (println (render-game (peek @game-states))))
+
+(defn print-score
+  "Prints the current score"
+  []
+  (println (render-score (peek @game-states))))
 
 (defn start-game
   "Reset the game to a clean slate, setting the board to the given size"
