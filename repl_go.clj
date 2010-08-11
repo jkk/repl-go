@@ -72,7 +72,8 @@
   [board stone coords]
   (reduce #(add-stone %1 stone %2) board coords))
 
-(def stone->char {:b \X :w \O :empty \.})
+(def stone->char {:b \X :bt \x :w \O :wt \o :empty \.})
+(def stone->territory {:b :bt :w :wt})
 
 (defn int->letter
   "0 => A, 1 => B, etc."
@@ -234,6 +235,19 @@
         scores))
     {:b 0 :w 0} (all-groups board)))
 
+(defn determine-territories
+  "Return a map from coord to stone, indicating ownership of :empty space
+   as territory for a player"
+  [board]
+  (reduce
+    (fn [owned-coords group]
+      (or (when (= :empty (stone-at board (first group)))
+            (when-let [owner (group-owner board group)]
+              (apply (partial assoc owned-coords)
+                     (interleave group (repeat owner)))))
+          owned-coords))
+    {} (all-groups board)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state
 
@@ -265,11 +279,18 @@
        (render-board (:board g))))
 
 (defn render-score
-  "Render a game's score as text"
+  "Render a game's board with filled in territories and score as text"
   [g]
-  (let [score (score (:board g))]
+  (let [board (:board g)
+        score (score board)
+        size (board-size board)
+        territory-owners (determine-territories board)]
     (str (stone->label :b) ": " (:b score) \newline
-         (stone->label :w) ": " (:w score) \newline)))
+         (stone->label :w) ": " (:w score) \newline
+         (render-board (vec (for [y (range size) x (range size)]
+                              (if-let [owner (territory-owners [x y])]
+                                (stone->territory owner)
+                                (stone-at board [x y]))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state succession, game playing, output
