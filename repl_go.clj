@@ -16,7 +16,6 @@
 ;; Licensed under WTFPL, http://en.wikipedia.org/wiki/WTFPL
 
 (ns repl-go
-  (:use [clojure.contrib.seq-utils :only (frequencies)])
   (:use [clojure.set :only [difference]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
