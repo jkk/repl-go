@@ -10,12 +10,13 @@
 ;;     (play-move :c4)          ; White move
 ;;     (play-move :c5)          ; Black move
 ;;     ...
+;;     (print-score)
 ;;
 ;; Copyright (c) 2009 Justin Kramer <jkkramer@gmail.com>
 ;; Licensed under WTFPL, http://en.wikipedia.org/wiki/WTFPL
 
 (ns repl-go
-  (:use [clojure.contrib.seq-utils :only (frequencies)]))
+  (:use [clojure.set :only [difference]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utility functions
@@ -42,6 +43,11 @@
   [size [x y]]
   (and (>= x 0) (< x size) (>= y 0) (< y size)))
 
+(defn all-coords
+  "Return the set of all coordinates for a board of the given size"
+  [size]
+  (set (for [x (range size) y (range size)] [x y])))
+
 (defn coord->index
   "Return the index of a given coordinate within a board vector"
   [size [x y]]
@@ -65,7 +71,8 @@
   [board stone coords]
   (reduce #(add-stone %1 stone %2) board coords))
 
-(def stone->char {:b \X :w \O :empty \.})
+(def stone->char {:b \X :bt \x :w \O :wt \o :empty \.})
+(def stone->territory {:b :bt :w :wt})
 
 (defn int->letter
   "0 => A, 1 => B, etc."
@@ -174,10 +181,71 @@
       (when-not (= new-board old-board) ;; ko?
         [new-board bcaps wcaps]))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Scoring
+
+(defn all-groups
+  "Return a vector of all groups on the board"
+  [board]
+  (loop [remaining-coords (all-coords (board-size board))
+         groups []]
+    (if (empty? remaining-coords)
+      groups
+      (let [next-group (group-at board (first remaining-coords))]
+        (recur (difference remaining-coords next-group)
+               (conj groups next-group))))))
+
+(defn all-same?
+  "Return nil if both colors are found in the coords, or :empty if
+   neither is found. Otherwise, the color occupying all the existent,
+   non-empty coords."
+  [board coords]
+  (let [occupied (filter #{:b :w} (map (partial stone-at board) coords))]
+    (cond
+      (empty? occupied) :empty
+      (apply = occupied) (first occupied))))
+
+(defn surrounded-by
+  "Return the sole color surrounding a group if such a color exists.
+   Otherwise, nil."
+  [board group]
+  (let [found (remove #(= :empty %)
+                      (map #(all-same? board (neighbors %)) group))]
+    (when (and (seq found) (first found) (apply = found))
+      (first found))))
+
+(defn group-owner
+  "If the group is composed of stones, return their color. Otherwise,
+   the color of the stones surrounding it, or nil if there is no single
+   owner."
+  [board group]
+  (let [stone (stone-at board (first group))]
+    (if (not= :empty stone)
+      stone
+      (surrounded-by board group))))
+
 (defn score
-  []
-  ;; TODO?
-  )
+  "Return a map of the score for the board"
+  [board]
+  (reduce
+    (fn [scores group]
+      (if-let [owner (group-owner board group)]
+        (assoc scores owner (+ (scores owner) (count group)))
+        scores))
+    {:b 0 :w 0} (all-groups board)))
+
+(defn determine-territories
+  "Return a map from coord to stone, indicating ownership of :empty space
+   as territory for a player"
+  [board]
+  (reduce
+    (fn [owned-coords group]
+      (or (when (= :empty (stone-at board (first group)))
+            (when-let [owner (group-owner board group)]
+              (apply (partial assoc owned-coords)
+                     (interleave group (repeat owner)))))
+          owned-coords))
+    {} (all-groups board)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state
@@ -209,6 +277,20 @@
        (stone->label (:turn g)) " to play" \newline
        (render-board (:board g))))
 
+(defn render-score
+  "Render a game's board with filled in territories and score as text"
+  [g]
+  (let [board (:board g)
+        score (score board)
+        size (board-size board)
+        territory-owners (determine-territories board)]
+    (str (stone->label :b) ": " (:b score) \newline
+         (stone->label :w) ": " (:w score) \newline
+         (render-board (vec (for [y (range size) x (range size)]
+                              (if-let [owner (territory-owners [x y])]
+                                (stone->territory owner)
+                                (stone-at board [x y]))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Game state succession, game playing, output
 ;;
@@ -226,6 +308,11 @@
   "Prints current game state"
   []
   (println (render-game (peek @game-states))))
+
+(defn print-score
+  "Prints the current score"
+  []
+  (println (render-score (peek @game-states))))
 
 (defn start-game
   "Reset the game to a clean slate, setting the board to the given size"
